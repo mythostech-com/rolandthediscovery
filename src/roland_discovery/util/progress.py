@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 
 _bar_active = False
+_last_line_len = 0
 _BAR_WIDTH = 20
 
 
@@ -22,8 +23,13 @@ def render(current: int, total: int, *, depth: int, queue: int, label: str, phas
 
     Falls back to a plain scrolling line when stdout isn't a terminal (redirected
     to a file, CI, etc.) so a live-updating bar never garbles non-interactive output.
+
+    Redraws via a bare carriage return, padded with trailing spaces to fully
+    overwrite whatever was on the line before - deliberately NOT using an ANSI
+    "clear line" escape (\\x1b[2K), since plenty of Windows consoles print that
+    literally instead of interpreting it, which garbles the output.
     """
-    global _bar_active
+    global _bar_active, _last_line_len
 
     suffix = f"  [{phase}]" if phase else ""
 
@@ -38,18 +44,20 @@ def render(current: int, total: int, *, depth: int, queue: int, label: str, phas
     pct = int(frac * 100)
     line = f"Discovering  [{bar}]  {pct:3d}%  {current}/{total} nodes  depth={depth}  queue={queue}  {label}{suffix}"
 
-    sys.stdout.write("\r\x1b[2K" + line)
+    sys.stdout.write("\r" + line.ljust(_last_line_len))
     sys.stdout.flush()
+    _last_line_len = len(line)
     _bar_active = True
 
 
 def break_line() -> None:
     """Move off the active bar line before printing something else. No-op if no bar is active."""
-    global _bar_active
+    global _bar_active, _last_line_len
     if _bar_active:
         sys.stdout.write("\n")
         sys.stdout.flush()
         _bar_active = False
+        _last_line_len = 0
 
 
 def status(msg: str) -> None:
