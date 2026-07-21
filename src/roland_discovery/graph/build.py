@@ -14,6 +14,7 @@ from roland_discovery.config import SnmpProfile
 from roland_discovery.graph.merge import merge_by_hostname, normalize_hostname
 from roland_discovery.snmp.cdp import get_cdp_neighbors
 from roland_discovery.snmp.client import SnmpV2cClient
+from roland_discovery.snmp.entity import DeviceInventory, get_device_inventory
 from roland_discovery.snmp.ipmib import load_interface_ips, load_ip_to_ifname
 from roland_discovery.snmp.system import get_sysdescr, get_sysname
 from roland_discovery.ssh.client import SshClient, SshProfile, load_ssh_profile_from_env
@@ -407,6 +408,7 @@ def build_topology(
     state_path: Optional[str] = None,
     resume_path: Optional[str] = None,
     state_every: int = 10,
+    enable_inventory: bool = True,
     enable_ssh: bool = False,
     ssh_user: str = "",
     ssh_pass: str = "",
@@ -437,6 +439,7 @@ def build_topology(
     ip_to_ifname: Dict[str, str] = {}
     ips: Set[str] = set()
     snmp = None
+    seed_inventory = DeviceInventory()
 
     try:
         snmp = _snmp_factory(profile, seed)
@@ -456,6 +459,12 @@ def build_topology(
         sysdescr = ""
         ip_to_ifname = {}
         ips = set()
+
+    if enable_inventory and snmp is not None:
+        try:
+            seed_inventory = get_device_inventory(snmp)
+        except Exception as e:
+            print(f"[DEBUG] ENTITY-MIB inventory lookup failed for seed {seed}: {e}")
 
     seed_class = classify_device(sysdescr or "", seed_hostname)
     seed_node_key = get_or_create_node(
@@ -482,6 +491,14 @@ def build_topology(
         }
     )
     g.nodes[seed_node_key]["main_ip"] = _pick_main_ip(seed, g.nodes[seed_node_key]["ips"], ip_to_ifname)
+    if sysname:
+        g.nodes[seed_node_key]["location"] = seed_hostname
+    if seed_inventory.make:
+        g.nodes[seed_node_key]["device_make"] = seed_inventory.make
+    if seed_inventory.model:
+        g.nodes[seed_node_key]["device_model"] = seed_inventory.model
+    if seed_inventory.serial:
+        g.nodes[seed_node_key]["device_serial"] = seed_inventory.serial
 
     # SSH profile
     ssh_profile = None
@@ -540,6 +557,7 @@ def build_topology(
         ip_to_ifname = {}
         ips = set()
         snmp = None
+        node_inventory = DeviceInventory()
 
         try:
             snmp = _snmp_factory(profile, ip)
@@ -553,6 +571,12 @@ def build_topology(
             poll_status = "failed"
             poll_error = str(e)
             print(f"[DEBUG] SNMP poll failed for {ip}: {poll_error}")
+
+        if enable_inventory and snmp is not None:
+            try:
+                node_inventory = get_device_inventory(snmp)
+            except Exception as e:
+                print(f"[DEBUG] ENTITY-MIB inventory lookup failed for {ip}: {e}")
 
         node_hostname = (sysname or ip).strip()
         node_class = classify_device(sysdescr or "", node_hostname)
@@ -654,6 +678,14 @@ def build_topology(
             }
         )
         g.nodes[local_node_key]["main_ip"] = _pick_main_ip(ip, g.nodes[local_node_key]["ips"], ip_to_ifname)
+        if sysname:
+            g.nodes[local_node_key]["location"] = node_hostname
+        if node_inventory.make:
+            g.nodes[local_node_key]["device_make"] = node_inventory.make
+        if node_inventory.model:
+            g.nodes[local_node_key]["device_model"] = node_inventory.model
+        if node_inventory.serial:
+            g.nodes[local_node_key]["device_serial"] = node_inventory.serial
 
         if depth == 0:
             g.nodes[local_node_key]["is_seed"] = True
