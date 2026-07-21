@@ -1,4 +1,11 @@
-# roland-the-discovery (v1.4)
+# roland-the-discovery (v1.5)
+
+## What's new vs v1.4
+- **Quiet by default**: normal runs now print a clean set of progress/status lines instead of dozens of
+  `[DEBUG]`/`[SNMP]`/`[RAW SNMP]`/`[LOGGED RAW]` lines per device. All internal tracing is still available —
+  pass `--debug` to get it back. See [Console output / --debug](#console-output---debug) below.
+- Removed a dead duplicate `log_raw_response()` in `ssh/client.py` that shadowed the shared one in
+  `util/logging.py` (no behavior change — SSH raw-response logging still works the same).
 
 ## What's new vs v1.3
 - **Asset catalog**: Roland now records `device_make`, `device_model`, `device_serial` (via ENTITY-MIB) and
@@ -85,6 +92,18 @@ Override with:
 - Added a simple search box (top-left): type and press Enter to zoom to a match
 - Nodes are colored by poll status (ok/failed/unpolled)
 
+
+## Console output / --debug
+
+By default Roland prints a clean set of lines: one per node as it's processed (`[roland] processing
+depth=... node=... visited=... queue=...`), phase markers (`[INFO] Running final edge deduplication...`, etc.),
+and real warnings/errors (failed polls, SSH failures, SNMP health-check failures). Internal step-by-step
+tracing (per-OID SNMP walks, per-command SSH chatter, raw-response log confirmations, CDP resolution steps,
+per-edge classification) is suppressed.
+
+Pass `--debug` (or set `ROLAND_SNMP_DEBUG=1` / `--ssh-debug` for just the SNMP/SSH wire-level dumps) to get
+the full verbose trace back — useful when a specific device is behaving unexpectedly and you need to see
+exactly what was sent/received.
 
 ## Asset catalog (make/model/serial/location)
 

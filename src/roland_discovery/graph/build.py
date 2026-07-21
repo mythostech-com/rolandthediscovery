@@ -18,6 +18,7 @@ from roland_discovery.snmp.entity import DeviceInventory, get_device_inventory
 from roland_discovery.snmp.ipmib import load_interface_ips, load_ip_to_ifname
 from roland_discovery.snmp.system import get_sysdescr, get_sysname
 from roland_discovery.ssh.client import SshClient, SshProfile, load_ssh_profile_from_env
+from roland_discovery.util.logging import debug
 
     
 def _normalize_ifname(ifname: Optional[str]) -> str:
@@ -384,7 +385,7 @@ def enrich_edge_l3_data(g: nx.MultiGraph) -> nx.MultiGraph:
             attrs["title"] = "\n".join(edge_title_lines)
             
             if link_type == "routed" or local_if_ips or remote_if_ips:
-                print(f"[L3-ENRICH] {u} {local_if} -> {v} {remote_if} | local={local_if_ips} remote={remote_if_ips}")
+                debug(f"[L3-ENRICH] {u} {local_if} -> {v} {remote_if} | local={local_if_ips} remote={remote_if_ips}")
 
     return g
 
@@ -464,7 +465,7 @@ def build_topology(
         try:
             seed_inventory = get_device_inventory(snmp)
         except Exception as e:
-            print(f"[DEBUG] ENTITY-MIB inventory lookup failed for seed {seed}: {e}")
+            debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for seed {seed}: {e}")
 
     seed_class = classify_device(sysdescr or "", seed_hostname)
     seed_node_key = get_or_create_node(
@@ -576,7 +577,7 @@ def build_topology(
             try:
                 node_inventory = get_device_inventory(snmp)
             except Exception as e:
-                print(f"[DEBUG] ENTITY-MIB inventory lookup failed for {ip}: {e}")
+                debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for {ip}: {e}")
 
         node_hostname = (sysname or ip).strip()
         node_class = classify_device(sysdescr or "", node_hostname)
@@ -619,7 +620,7 @@ def build_topology(
                         ssh_hn = hn_match.group(1).strip()
                         if ssh_hn and len(ssh_hn) > len(node_hostname):
                             node_hostname = ssh_hn
-                            print(f"[DEBUG] SSH overrode hostname to: {ssh_hn}")
+                            debug(f"[DEBUG] SSH overrode hostname to: {ssh_hn}")
                             local_node_key = get_or_create_node(
                                 g,
                                 ip,
@@ -721,27 +722,27 @@ def build_topology(
             g.nodes[local_node_key]["orphan_svis"] = []
 
         if depth >= max_depth:
-            print(f"[DEBUG] Max depth reached for {ip}")
+            debug(f"[DEBUG] Max depth reached for {ip}")
             continue
 
         # CDP neighbors
         try:
-            print(f"[DEBUG] Starting CDP for {ip} - snmp={snmp is not None}, ssh_enabled={enable_ssh}")
+            debug(f"[DEBUG] Starting CDP for {ip} - snmp={snmp is not None}, ssh_enabled={enable_ssh}")
             nbs = []
 
             if snmp is not None:
-                print("[DEBUG] Trying SNMP CDP...")
+                debug("[DEBUG] Trying SNMP CDP...")
                 try:
                     raw_nbs = get_cdp_neighbors(snmp)
                     nbs = [asdict(nb) if is_dataclass(nb) else nb.__dict__ for nb in raw_nbs]
-                    print(f"[DEBUG] SNMP CDP returned {len(nbs)} neighbors")
+                    debug(f"[DEBUG] SNMP CDP returned {len(nbs)} neighbors")
                 except Exception as e:
-                    print(f"[DEBUG] SNMP CDP failed: {e}")
+                    debug(f"[DEBUG] SNMP CDP failed: {e}")
 
             if not nbs and enable_ssh and ssh_profile is not None:
                 from roland_discovery.ssh.enrich import parse_cdp_neighbors_detail
 
-                print("[DEBUG] SNMP CDP unavailable - falling back to SSH")
+                debug("[DEBUG] SNMP CDP unavailable - falling back to SSH")
                 try:
                     ssh = SshClient(ip, ssh_profile, debug=ssh_debug)
                     ssh.connect()
@@ -750,16 +751,16 @@ def build_topology(
                     parsed_neighbors = parse_cdp_neighbors_detail(cdp_raw)
                     nbs = [asdict(n) if is_dataclass(n) else n.__dict__ for n in parsed_neighbors]
                     ssh.close()
-                    print(f"[DEBUG] SSH CDP fallback returned {len(nbs)} neighbors")
+                    debug(f"[DEBUG] SSH CDP fallback returned {len(nbs)} neighbors")
                 except Exception as e:
-                    print(f"[DEBUG] SSH CDP fallback failed: {e}")
+                    debug(f"[DEBUG] SSH CDP fallback failed: {e}")
 
             g.nodes[local_node_key]["cdp_neighbors_raw"] = nbs
 
             if not nbs:
-                print("[DEBUG] No CDP neighbors found")
+                debug("[DEBUG] No CDP neighbors found")
             else:
-                print(f"[DEBUG] CDP neighbors for {node_hostname} ({ip}): {len(nbs)} found")
+                debug(f"[DEBUG] CDP neighbors for {node_hostname} ({ip}): {len(nbs)} found")
 
                 for nb in nbs:
                     remote_ip = nb.get("mgmt_ip") or nb.get("ip")
@@ -768,7 +769,7 @@ def build_topology(
 
                     remote_device = (nb.get("device_id") or nb.get("remote_device") or "?").strip()
                     if remote_device.lower().startswith("axis"):
-                        print(f"[DEBUG] Skipping Axis camera: {remote_device} @ {remote_ip}")
+                        debug(f"[DEBUG] Skipping Axis camera: {remote_device} @ {remote_ip}")
                         continue
 
                     remote_platform = nb.get("platform", "?")
@@ -864,17 +865,17 @@ def build_topology(
                         link_type=link_type,
                     )
 
-                    print(f"[EDGE] {local_if} → {remote_if} | type={link_type} | vlan_info='{vlan_info}'")
+                    debug(f"[EDGE] {local_if} → {remote_if} | type={link_type} | vlan_info='{vlan_info}'")
                     edges_added += 1
 
                     remote_role = remote_class.role if isinstance(remote_class, DeviceClass) else "unknown"
                     if remote_ip not in visited:
                         if traverse_all or "HUB_" in remote_device.upper():
                             q.append((remote_ip, depth + 1))
-                            print(f"[DEBUG] Enqueued {remote_ip} at depth {depth + 1} from {ip}")
+                            debug(f"[DEBUG] Enqueued {remote_ip} at depth {depth + 1} from {ip}")
                         elif depth < max_depth - 1 and remote_role in traverse_roles:
                             q.append((remote_ip, depth + 1))
-                            print(f"[DEBUG] Enqueued {remote_ip} at depth {depth + 1} from {ip} (role match)")
+                            debug(f"[DEBUG] Enqueued {remote_ip} at depth {depth + 1} from {ip} (role match)")
 
                     if edges_added >= max_edges:
                         print("[roland] max-edges reached; stopping")
@@ -899,7 +900,7 @@ def build_topology(
     print("[INFO] Enriching final L3 edge data...")
     g = enrich_edge_l3_data(g)
 
-    print(f"[DEBUG] Final graph: {len(g.nodes)} nodes, {len(g.edges)} edges")
+    debug(f"[DEBUG] Final graph: {len(g.nodes)} nodes, {len(g.edges)} edges")
 
     seed_node = g.nodes.get(seed, {})
     if not seed_node:

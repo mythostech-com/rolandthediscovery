@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Set, Dict
 
+from roland_discovery.util.logging import debug
+
 # ipAddrTable: ipAdEntAddr (deprecated but widely supported and simple)
 # Each row's OID ends with the IPv4 address (a.b.c.d).
 IPADENTADDR_OID = "1.3.6.1.2.1.4.20.1.1"
@@ -40,7 +42,7 @@ def load_ip_to_ifname(snmp):
         ip_to_index_raw = snmp.walk(ip_to_index_oid)
         ip_to_index = {}
         for full_oid, value in ip_to_index_raw:
-            print("[RAW SNMP ipAdEntIfIndex]", (full_oid, value))
+            debug("[RAW SNMP ipAdEntIfIndex]", (full_oid, value))
             # Suffix after OID. is the IP (dot-separated)
             suffix = full_oid[len(ip_to_index_oid) + 1:]  # strip OID + dot
             ip = suffix.replace('.', '.')  # already dot-separated
@@ -51,16 +53,16 @@ def load_ip_to_ifname(snmp):
             except ValueError:
                 continue
 
-        print(f"[DEBUG ipmib] Found {len(ip_to_index)} IP → ifIndex mappings")
+        debug(f"[DEBUG ipmib] Found {len(ip_to_index)} IP → ifIndex mappings")
         if ip_to_index:
-            print("[DEBUG ipmib] Sample IP → ifIndex:", dict(list(ip_to_index.items())[:5]))
+            debug("[DEBUG ipmib] Sample IP → ifIndex:", dict(list(ip_to_index.items())[:5]))
 
         # 2. ifIndex → name (prefer ifName)
         ifname_oid = "1.3.6.1.2.1.31.1.1.1.1"
         ifname_raw = snmp.walk(ifname_oid)
         ifindex_to_name = {}
         for full_oid, value in ifname_raw:
-            print("[RAW SNMP ifName]", (full_oid, value))
+            debug("[RAW SNMP ifName]", (full_oid, value))
             # Suffix after OID. is the ifIndex (e.g., "1")
             suffix = full_oid[len(ifname_oid) + 1:]  # strip OID + dot
             try:
@@ -76,7 +78,7 @@ def load_ip_to_ifname(snmp):
             ifdescr_oid = "1.3.6.1.2.1.2.2.1.2"
             ifdescr_raw = snmp.walk(ifdescr_oid)
             for full_oid, value in ifdescr_raw:
-                print("[RAW SNMP ifDescr]", (full_oid, value))
+                debug("[RAW SNMP ifDescr]", (full_oid, value))
                 suffix = full_oid[len(ifdescr_oid) + 1:]
                 try:
                     idx = int(suffix)
@@ -86,9 +88,9 @@ def load_ip_to_ifname(snmp):
                 if value:
                     ifindex_to_name[idx] = value
 
-        print(f"[DEBUG ipmib] Found {len(ifindex_to_name)} ifIndex → name mappings")
+        debug(f"[DEBUG ipmib] Found {len(ifindex_to_name)} ifIndex → name mappings")
         if ifindex_to_name:
-            print("[DEBUG ipmib] Sample ifIndex → name:", dict(list(ifindex_to_name.items())[:5]))
+            debug("[DEBUG ipmib] Sample ifIndex → name:", dict(list(ifindex_to_name.items())[:5]))
 
         # 3. Combine
         for ip, ifindex in ip_to_index.items():
@@ -96,11 +98,11 @@ def load_ip_to_ifname(snmp):
             if name:
                 result[ip] = name
             else:
-                print(f"[WARN ipmib] No name for ifIndex {ifindex} (IP {ip})")
+                debug(f"[WARN ipmib] No name for ifIndex {ifindex} (IP {ip})")
 
-        print(f"[DEBUG ipmib] Final ip_to_ifname entries: {len(result)}")
+        debug(f"[DEBUG ipmib] Final ip_to_ifname entries: {len(result)}")
         if result:
-            print("[DEBUG ipmib] Sample ip_to_ifname:", dict(list(result.items())[:5]))
+            debug("[DEBUG ipmib] Sample ip_to_ifname:", dict(list(result.items())[:5]))
 
         return result
 

@@ -16,6 +16,8 @@ def main():
     p.add_argument("--seed", help="Seed device management IP")
     p.add_argument("--community", default=os.getenv("ROLAND_SNMP_COMMUNITY"),
                    help="SNMPv2c community string")
+    p.add_argument("--debug", action="store_true",
+                   help="Show verbose internal tracing (per-OID/per-command chatter). Off by default.")
 
     p.add_argument("--depth", type=int, default=2)
     p.add_argument("--max-edges", type=int, default=5000)
@@ -47,6 +49,9 @@ def main():
     p.add_argument("--traverse-role", action="append", default=None)
 
     args = p.parse_args()
+
+    if args.debug:
+        os.environ["ROLAND_DEBUG"] = "1"
 
     resuming = bool(args.resume)
 
