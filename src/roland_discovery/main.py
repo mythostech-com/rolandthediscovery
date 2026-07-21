@@ -6,6 +6,7 @@ from roland_discovery.graph.build import build_topology
 from roland_discovery.export.json_export import export_json
 from roland_discovery.export.dot_export import export_dot
 from roland_discovery.export.html_export import export_html
+from roland_discovery.export.inventory_export import export_inventory_csv
 from roland_discovery.report.summary import print_summary
 
 
@@ -28,6 +29,9 @@ def main():
     p.add_argument("--ssh-timeout", type=int, default=15)
     p.add_argument("--ssh-port", type=int, default=22)
     p.add_argument("--ssh-debug", action="store_true")
+
+    p.add_argument("--no-inventory", action="store_true", help="Skip ENTITY-MIB make/model/serial lookup (on by default)")
+    p.add_argument("--inventory-csv", default="out/inventory.csv", help="Write a make/model/serial/location catalog CSV here (set to '' to skip)")
 
     p.add_argument("--l2", action="store_true")
     p.add_argument("--endpoints", action="store_true")
@@ -100,6 +104,7 @@ def main():
         traverse_roles=args.traverse_role,
         endpoints=args.endpoints,
         max_endpoints_per_device=args.max_endpoints_per_device,
+        enable_inventory=not args.no_inventory,
     )
 
     print(f"[INFO] Final graph: {len(g.nodes)} nodes, {len(g.edges)} edges")
@@ -111,6 +116,9 @@ def main():
     if args.html:
         export_html(g, args.html)
         print(f"[INFO] HTML saved to {args.html}")
+
+    if args.inventory_csv:
+        export_inventory_csv(g, args.inventory_csv)
 
     if args.summary:
         print_summary(g)

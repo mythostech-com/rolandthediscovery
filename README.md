@@ -1,4 +1,14 @@
-# roland-the-discovery (v1.3)
+# roland-the-discovery (v1.4)
+
+## What's new vs v1.3
+- **Asset catalog**: Roland now records `device_make`, `device_model`, `device_serial` (via ENTITY-MIB) and
+  `location` (the device's SNMP hostname) on every polled node, and writes them to a new `out/inventory.csv`.
+  See [Asset catalog (make/model/serial/location)](#asset-catalog-makemodelserialslocation) below.
+- Fixed the HTML viewer's "hide leaf / hide unpolled / hide failed / only infra" filter checkboxes — they were
+  silent no-ops because the node data they filter on (`roland_status`/`roland_role`/`roland_degree`) was never
+  attached to graph nodes.
+- Removed stray backup/scratch files (`*.bak`, `build3.py`, top-level `build.py`/`client.py`, `graph/utils.py`)
+  and committed `.zip`/`.diff` snapshots that weren't part of the actual package.
 
 ## What's new vs v0.8
 - Progress output now includes **queue size** and **neighbors/enqueue counts** so you can estimate “how much left”.
@@ -15,6 +25,7 @@ roland-discovery --seed 10.21.90.1 --community COMMUNITY --depth 3 --max-nodes 2
 - JSON: `out/topology.json`
 - DOT:  `out/topology.dot`
 - HTML: `out/topology.html` (interactive zoom/pan/drag)
+- CSV:  `out/inventory.csv` (asset catalog: make/model/serial/location, see below)
 
 ## Graphviz tips
 - Prefer SVG for crisp zoom:
@@ -74,6 +85,26 @@ Override with:
 - Added a simple search box (top-left): type and press Enter to zoom to a match
 - Nodes are colored by poll status (ok/failed/unpolled)
 
+
+## Asset catalog (make/model/serial/location)
+
+On by default, Roland queries **ENTITY-MIB** (`1.3.6.1.2.1.47.1.1.1.1`) on every polled device to record:
+- `device_make` (`entPhysicalMfgName`, e.g. "Cisco Systems, Inc.")
+- `device_model` (`entPhysicalModelName`, e.g. "N5K-C5010P-BF")
+- `device_serial` (`entPhysicalSerialNum`)
+
+These come from the chassis entry (`entPhysicalClass=3`), falling back to the lowest physical index if a device
+doesn't report a class. Lookup is best-effort: devices that don't support ENTITY-MIB simply get no make/model/serial.
+
+**Location** is recorded as the device's SNMP hostname (`sysName`) verbatim — no parsing or site-code extraction.
+
+These fields are:
+- written to every node in `topology.json` and shown in the HTML tooltip
+- written as one row per device to `out/inventory.csv` (columns: hostname, location, main_ip, ips, device_make,
+  device_model, device_serial, device_role, device_vendor, device_family, poll_status)
+
+Disable with `--no-inventory`. Change the CSV path with `--inventory-csv <path>` (pass `--inventory-csv ""` to skip
+writing it).
 
 ## SSH enrichment (optional)
 

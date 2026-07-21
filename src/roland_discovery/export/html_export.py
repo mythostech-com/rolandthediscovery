@@ -161,6 +161,17 @@ def _node_title(attrs: dict, node_id: str) -> str:
     if main_ip:
         parts.append(f"Main/Mgmt IP: {main_ip}")  # Highlighted
 
+    loc = attrs.get("location")
+    if loc:
+        parts.append(f"Location: {loc}")
+    make = attrs.get("device_make")
+    model = attrs.get("device_model")
+    if make or model:
+        parts.append(f"Make/Model: {make or '?'} {model or ''}".rstrip())
+    serial = attrs.get("device_serial")
+    if serial:
+        parts.append(f"Serial: {serial}")
+
     # All IPs
     ips = attrs.get("ips", [])
     if ips and len(ips) > 1:
@@ -275,7 +286,11 @@ def export_html(g, path: str):
                 "#ffcc66" if attrs.get("ssh_status") == "failed" else \
                 "#cccccc" if attrs.get("poll_status") == "unpolled" else \
                 "#66cc66"
-        net.add_node(n, label=label, title=title, size=size, color=color)
+        net.add_node(
+            n, label=label, title=title, size=size, color=color,
+            roland_status=attrs.get("poll_status") or "", roland_role=attrs.get("device_role") or "",
+            roland_degree=g.degree(n),
+        )
 
     # Edges
     for u, v, data in g.edges(data=True):
