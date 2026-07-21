@@ -1,4 +1,10 @@
-# roland-the-discovery (v1.8)
+# roland-the-discovery (v1.9)
+
+## What's new vs v1.8
+- Clears the terminal right before the startup banner, for a clean first screen instead of the banner
+  appearing after whatever was already scrolled in your console. Uses the native `cls`/`clear` command rather
+  than an ANSI escape (same reasoning as the progress bar fix above — not every console interprets those).
+  Skipped automatically when stdout isn't a terminal.
 
 ## What's new vs v1.7
 - **Fixed progress bar corruption on Windows consoles that don't interpret ANSI escapes**: the bar previously

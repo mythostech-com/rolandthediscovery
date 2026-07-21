@@ -8,6 +8,7 @@ from roland_discovery.export.dot_export import export_dot
 from roland_discovery.export.html_export import export_html
 from roland_discovery.export.inventory_export import export_inventory_csv
 from roland_discovery.report.summary import print_summary
+from roland_discovery.util import progress
 
 _BANNER_WIDTH = 60
 
@@ -101,6 +102,7 @@ def main():
     if not args.community:
         raise SystemExit("SNMP community is required.")
 
+    progress.clear_screen()
     _print_banner(args)
 
     profile = SnmpProfile(community=args.community)
