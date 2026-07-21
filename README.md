@@ -1,4 +1,16 @@
-# roland-the-discovery (v1.6)
+# roland-the-discovery (v1.7)
+
+## What's new vs v1.6
+- **Startup banner**: a run now immediately prints seed/depth/max-nodes/SSH/traverse-all/inventory settings
+  before any network calls happen, so you get instant confirmation the tool launched — regardless of how slow
+  the crawl itself ends up being.
+- **"What's happening now" phase tags** on the progress bar (`[SNMP: interface map]`, `[CDP neighbors]`,
+  `[SSH enrich]`, etc.) so a slow/stuck step is visible instead of the bar just sitting there looking frozen.
+- Fixed `snmp/cdp.py` (SNMP-based CDP neighbor discovery) printing a dense, unconditional per-neighbor debug
+  trace (`[RAW SNMP cdpCacheDeviceId]`, `[DEBUG cdp mgmt_raw]`, `[DEBUG cdp neighbor]`) that got missed in the
+  v1.5 quiet-output pass — this was gluing straight onto the end of the progress bar line with no line break.
+  Also fixed one stray unconditional debug print in `ssh/enrich.py`. Both now respect `--debug` like everything
+  else.
 
 ## What's new vs v1.5
 - **Live progress bar**: interactive runs now show a single in-place bar (`Discovering [████░░░░] 55% 138/250

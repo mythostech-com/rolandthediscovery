@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Any, Tuple
 
 from roland_discovery.ssh.client import SshClient  # if needed for type hints; optional
+from roland_discovery.util.logging import debug
 
 
 @dataclass
@@ -39,7 +40,7 @@ def parse_show_ip_interface_brief(text: str) -> Dict[str, str]:
             ip = parts[1]
             if re.match(r'^\d+\.\d+\.\d+\.\d+$', ip):
                 out[iface] = ip
-    print(f"[DEBUG enrich] Parsed {len(out)} entries from ip int brief")
+    debug(f"[DEBUG enrich] Parsed {len(out)} entries from ip int brief")
     return out
 
 
