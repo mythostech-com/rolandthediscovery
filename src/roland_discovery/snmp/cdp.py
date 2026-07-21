@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from typing import List
 
+from roland_discovery.util.logging import debug
+from roland_discovery.util import progress
+
 @dataclass
 class Neighbor:
     mgmt_ip: str
@@ -15,7 +18,7 @@ def get_cdp_neighbors(snmp):
     device_id_oid = "1.3.6.1.4.1.9.9.23.1.2.1.1.6"
     device_id_raw = snmp.walk(device_id_oid)
     for full_oid, value in device_id_raw:
-        print("[RAW SNMP cdpCacheDeviceId]", (full_oid, value))  # add for debug
+        debug("[RAW SNMP cdpCacheDeviceId]", (full_oid, value))
         # Suffix after OID. is "ifIndex.entryIdx"
         # Extract index from suffix (e.g. "3.88")
         suffix = full_oid[len(device_id_oid) + 1:]  # after OID + dot
@@ -38,7 +41,7 @@ def get_cdp_neighbors(snmp):
         mgmt_ip_raw = snmp.get(mgmt_ip_oid)
         if mgmt_ip_raw:
             value = mgmt_ip_raw.strip()
-            print(f"[DEBUG cdp mgmt_raw] {mgmt_ip_oid} → {value}")
+            debug(f"[DEBUG cdp mgmt_raw] {mgmt_ip_oid} → {value}")
             hex_part = value
             if 'IpAddress: ' in value:
                 hex_part = value.split('IpAddress: ')[1].strip()
@@ -53,11 +56,11 @@ def get_cdp_neighbors(snmp):
                 else:
                     raise ValueError("Not 4 bytes")
             except Exception as e:
-                print(f"[WARN cdp hex fail] {hex_part} → {e}")
+                progress.status(f"[WARN cdp hex fail] {hex_part} → {e}")
                 mgmt_ip = hex_part  # fallback to raw hex
 
         if not mgmt_ip:
-            print(f"[WARN cdp] No mgmt_ip for {remote_device} (index {full_index})")
+            debug(f"[WARN cdp] No mgmt_ip for {remote_device} (index {full_index})")
             
         # Local interface (prefer ifName for short names like Te2/0/23)
         local_if = ""
@@ -94,7 +97,7 @@ def get_cdp_neighbors(snmp):
             platform = platform.strip('"')  # remove quotes
             
         # Debug print before creating object
-        print(f"[DEBUG cdp neighbor] {remote_device} | IP: {mgmt_ip} | local_if: {local_if} | remote_port: {remote_port} | platform: {platform}")
+        debug(f"[DEBUG cdp neighbor] {remote_device} | IP: {mgmt_ip} | local_if: {local_if} | remote_port: {remote_port} | platform: {platform}")
 
         # Create neighbor only if we have mgmt_ip (skip invalid entries)
         if mgmt_ip:
@@ -107,7 +110,7 @@ def get_cdp_neighbors(snmp):
             )
             neighbors.append(neighbor)
         else:
-            print(f"[WARN cdp] Skipping neighbor {remote_device} - no valid mgmt_ip")
+            debug(f"[WARN cdp] Skipping neighbor {remote_device} - no valid mgmt_ip")
             
-    print(f"[DEBUG cdp] Parsed {len(neighbors)} neighbors")
+    debug(f"[DEBUG cdp] Parsed {len(neighbors)} neighbors")
     return neighbors

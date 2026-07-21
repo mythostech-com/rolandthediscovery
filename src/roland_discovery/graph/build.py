@@ -443,13 +443,24 @@ def build_topology(
     snmp = None
     seed_inventory = DeviceInventory()
 
+    def _seed_phase(p: str) -> None:
+        if debug_enabled():
+            print(f"[roland] processing depth=0 node={seed} visited=0/{max_nodes} queue=0 [{p}]")
+        else:
+            progress.render(0, max_nodes, depth=0, queue=0, label=seed, phase=p)
+
+    _seed_phase("SNMP: connecting to seed")
+
     try:
         snmp = _snmp_factory(profile, seed)
         if not snmp._check_snmp_health():
             raise RuntimeError("SNMP health check failed - skipping all SNMP queries for seed")
+        _seed_phase("SNMP: sysName/sysDescr")
         sysname = get_sysname(snmp) or ""
         sysdescr = get_sysdescr(snmp) or ""
+        _seed_phase("SNMP: interface map")
         ip_to_ifname = load_ip_to_ifname(snmp)
+        _seed_phase("SNMP: interface IPs")
         ips = load_interface_ips(snmp)
         if sysname:
             seed_hostname = sysname.strip()
@@ -464,6 +475,7 @@ def build_topology(
 
     if enable_inventory and snmp is not None:
         try:
+            _seed_phase("SNMP: inventory (ENTITY-MIB)")
             seed_inventory = get_device_inventory(snmp)
         except Exception as e:
             debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for seed {seed}: {e}")
@@ -546,10 +558,14 @@ def build_topology(
             break
 
         visited.add(ip)
-        if debug_enabled():
-            print(f"[roland] processing depth={depth} node={ip} visited={len(visited)} queue={len(q)}")
-        else:
-            progress.render(len(visited), max_nodes, depth=depth, queue=len(q), label=ip)
+
+        def _phase(p: str) -> None:
+            if debug_enabled():
+                print(f"[roland] processing depth={depth} node={ip} visited={len(visited)} queue={len(q)} [{p}]")
+            else:
+                progress.render(len(visited), max_nodes, depth=depth, queue=len(q), label=ip, phase=p)
+
+        _phase("SNMP: connecting")
 
         if ip not in g:
             g.add_node(ip, ip=ip, main_ip=ip, hostname=ip, norm_hostname=ip.lower(), ips=[ip])
@@ -568,9 +584,12 @@ def build_topology(
             snmp = _snmp_factory(profile, ip)
             if not snmp._check_snmp_health():
                 raise RuntimeError("SNMP health check failed - skipping all SNMP queries")
+            _phase("SNMP: sysName/sysDescr")
             sysname = get_sysname(snmp) or ""
             sysdescr = get_sysdescr(snmp) or ""
+            _phase("SNMP: interface map")
             ip_to_ifname = load_ip_to_ifname(snmp)
+            _phase("SNMP: interface IPs")
             ips = load_interface_ips(snmp)
         except Exception as e:
             poll_status = "failed"
@@ -579,6 +598,7 @@ def build_topology(
 
         if enable_inventory and snmp is not None:
             try:
+                _phase("SNMP: inventory (ENTITY-MIB)")
                 node_inventory = get_device_inventory(snmp)
             except Exception as e:
                 debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for {ip}: {e}")
@@ -606,6 +626,7 @@ def build_topology(
                 parse_show_ip_interface_brief,
             )
             try:
+                _phase("SSH enrich")
                 debug(f"[roland] ssh enrich node={ip}")
                 ssh = SshClient(ip, ssh_profile, debug=ssh_debug)
                 ssh.connect()
@@ -734,6 +755,7 @@ def build_topology(
 
         # CDP neighbors
         try:
+            _phase("CDP neighbors")
             debug(f"[DEBUG] Starting CDP for {ip} - snmp={snmp is not None}, ssh_enabled={enable_ssh}")
             nbs = []
 

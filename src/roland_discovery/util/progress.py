@@ -13,16 +13,22 @@ def _is_tty() -> bool:
         return False
 
 
-def render(current: int, total: int, *, depth: int, queue: int, label: str) -> None:
+def render(current: int, total: int, *, depth: int, queue: int, label: str, phase: str = "") -> None:
     """Draw (or redraw in place) a single-line progress bar.
+
+    `phase` is a short "what's happening right now" tag (e.g. "SNMP: sysName",
+    "CDP neighbors", "SSH enrich") so a slow/stuck step is visible instead of
+    the bar just sitting there looking frozen.
 
     Falls back to a plain scrolling line when stdout isn't a terminal (redirected
     to a file, CI, etc.) so a live-updating bar never garbles non-interactive output.
     """
     global _bar_active
 
+    suffix = f"  [{phase}]" if phase else ""
+
     if not _is_tty():
-        print(f"[roland] processing depth={depth} node={label} visited={current}/{total} queue={queue}")
+        print(f"[roland] processing depth={depth} node={label} visited={current}/{total} queue={queue}{suffix}")
         return
 
     total = max(total, 1)
@@ -30,7 +36,7 @@ def render(current: int, total: int, *, depth: int, queue: int, label: str) -> N
     filled = int(_BAR_WIDTH * frac)
     bar = "█" * filled + "░" * (_BAR_WIDTH - filled)
     pct = int(frac * 100)
-    line = f"Discovering  [{bar}]  {pct:3d}%  {current}/{total} nodes  depth={depth}  queue={queue}  {label}"
+    line = f"Discovering  [{bar}]  {pct:3d}%  {current}/{total} nodes  depth={depth}  queue={queue}  {label}{suffix}"
 
     sys.stdout.write("\r\x1b[2K" + line)
     sys.stdout.flush()

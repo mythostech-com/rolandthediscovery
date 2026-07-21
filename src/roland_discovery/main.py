@@ -9,6 +9,28 @@ from roland_discovery.export.html_export import export_html
 from roland_discovery.export.inventory_export import export_inventory_csv
 from roland_discovery.report.summary import print_summary
 
+_BANNER_WIDTH = 60
+
+
+def _print_banner(args) -> None:
+    rows = [
+        ("Seed", args.seed),
+        ("Depth", args.depth),
+        ("Max nodes", args.max_nodes),
+        ("SSH enrich", "on" if args.ssh else "off"),
+        ("Traverse-all", "on" if args.traverse_all else "off"),
+        ("Inventory", "off" if args.no_inventory else "on"),
+    ]
+    if args.resume:
+        rows.append(("Resuming from", args.resume))
+
+    print("=" * _BANNER_WIDTH)
+    print("  Roland the Discovery — starting SNMP/CDP topology crawl")
+    print("=" * _BANNER_WIDTH)
+    for label, value in rows:
+        print(f"  {label + ':':<14}{value}")
+    print("=" * _BANNER_WIDTH)
+
 
 def main():
     p = argparse.ArgumentParser(description="Roland Network Discovery Tool")
@@ -78,6 +100,8 @@ def main():
 
     if not args.community:
         raise SystemExit("SNMP community is required.")
+
+    _print_banner(args)
 
     profile = SnmpProfile(community=args.community)
 
