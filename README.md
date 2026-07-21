@@ -1,4 +1,14 @@
-# roland-the-discovery (v1.7)
+# roland-the-discovery (v1.8)
+
+## What's new vs v1.7
+- **Fixed progress bar corruption on Windows consoles that don't interpret ANSI escapes**: the bar previously
+  cleared each line with `\x1b[2K`, which some Windows consoles print literally (`←[2K`) instead of acting on,
+  leaving stale characters from a longer previous line behind when the new line was shorter. It now pads with
+  trailing spaces to the previous line's length instead — no ANSI codes involved at all.
+- Downgraded `[WARN cdp hex fail]` to `--debug`-only and gave it real context (OID + raw value) when it does
+  show — it fires routinely for CDP neighbors (phones, APs, etc.) that don't report a management address, so
+  it was never actually an actionable warning, just confusing noise (previously showed as a bare `→ Not 4 bytes`
+  with no indication of which neighbor or field).
 
 ## What's new vs v1.6
 - **Startup banner**: a run now immediately prints seed/depth/max-nodes/SSH/traverse-all/inventory settings

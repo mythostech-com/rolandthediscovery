@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from typing import List
 
 from roland_discovery.util.logging import debug
-from roland_discovery.util import progress
 
 @dataclass
 class Neighbor:
@@ -56,7 +55,9 @@ def get_cdp_neighbors(snmp):
                 else:
                     raise ValueError("Not 4 bytes")
             except Exception as e:
-                progress.status(f"[WARN cdp hex fail] {hex_part} → {e}")
+                # Routine: plenty of CDP neighbors (phones, APs, etc.) don't report a
+                # management address at all, so this fires often in normal operation.
+                debug(f"[WARN cdp hex fail] oid={mgmt_ip_oid} raw='{hex_part}' → {e}")
                 mgmt_ip = hex_part  # fallback to raw hex
 
         if not mgmt_ip:
