@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Set, Dict
 
 from roland_discovery.util.logging import debug
+from roland_discovery.util import progress
 
 # ipAddrTable: ipAdEntAddr (deprecated but widely supported and simple)
 # Each row's OID ends with the IPv4 address (a.b.c.d).
@@ -107,5 +108,5 @@ def load_ip_to_ifname(snmp):
         return result
 
     except Exception as e:
-        print(f"[ERROR ipmib] Failed to load ip_to_ifname: {str(e)}")
+        progress.status(f"[ERROR ipmib] Failed to load ip_to_ifname: {str(e)}")
         return {}

@@ -18,7 +18,8 @@ from roland_discovery.snmp.entity import DeviceInventory, get_device_inventory
 from roland_discovery.snmp.ipmib import load_interface_ips, load_ip_to_ifname
 from roland_discovery.snmp.system import get_sysdescr, get_sysname
 from roland_discovery.ssh.client import SshClient, SshProfile, load_ssh_profile_from_env
-from roland_discovery.util.logging import debug
+from roland_discovery.util.logging import debug, debug_enabled
+from roland_discovery.util import progress
 
     
 def _normalize_ifname(ifname: Optional[str]) -> str:
@@ -422,7 +423,7 @@ def build_topology(
 
     if resume_path and os.path.exists(resume_path):
         g, q, visited = _load_state(resume_path)
-        print(f"[INFO] Resumed with {len(q)} items in queue and {len(visited)} visited nodes")
+        progress.status(f"[INFO] Resumed with {len(q)} items in queue and {len(visited)} visited nodes")
     else:
         g = nx.MultiGraph()
         q = deque([(seed, 0)])
@@ -455,7 +456,7 @@ def build_topology(
     except Exception as e:
         poll_status = "failed"
         poll_error = str(e)
-        print(f"[DEBUG] SNMP poll failed for seed {seed}: {poll_error}")
+        progress.status(f"[DEBUG] SNMP poll failed for seed {seed}: {poll_error}")
         sysname = ""
         sysdescr = ""
         ip_to_ifname = {}
@@ -507,7 +508,7 @@ def build_topology(
     if enable_ssh:
         if ssh_debug:
             os.environ["ROLAND_SSH_DEBUG"] = "1"
-            print("[roland] ssh debug enabled")
+            progress.status("[roland] ssh debug enabled")
 
         if ssh_user and ssh_pass:
             ssh_profile = SshProfile(
@@ -523,9 +524,9 @@ def build_topology(
             ssh_source = "env" if ssh_profile else "missing"
 
         if ssh_profile is None:
-            print("[roland] WARN: --ssh enabled but no credentials found")
+            progress.status("[roland] WARN: --ssh enabled but no credentials found")
         else:
-            print(f"[roland] ssh enabled (source: {ssh_source})")
+            progress.status(f"[roland] ssh enabled (source: {ssh_source})")
             if ssh_debug and hasattr(ssh_profile, "log_path") and not ssh_profile.log_path:
                 base_dir = os.path.dirname(state_path or "out")
                 os.makedirs(base_dir, exist_ok=True)
@@ -541,11 +542,14 @@ def build_topology(
             continue
 
         if len(visited) >= max_nodes:
-            print(f"[roland] max-nodes reached ({max_nodes}); stopping")
+            progress.status(f"[roland] max-nodes reached ({max_nodes}); stopping")
             break
 
         visited.add(ip)
-        print(f"[roland] processing depth={depth} node={ip} visited={len(visited)} queue={len(q)}")
+        if debug_enabled():
+            print(f"[roland] processing depth={depth} node={ip} visited={len(visited)} queue={len(q)}")
+        else:
+            progress.render(len(visited), max_nodes, depth=depth, queue=len(q), label=ip)
 
         if ip not in g:
             g.add_node(ip, ip=ip, main_ip=ip, hostname=ip, norm_hostname=ip.lower(), ips=[ip])
@@ -571,7 +575,7 @@ def build_topology(
         except Exception as e:
             poll_status = "failed"
             poll_error = str(e)
-            print(f"[DEBUG] SNMP poll failed for {ip}: {poll_error}")
+            progress.status(f"[DEBUG] SNMP poll failed for {ip}: {poll_error}")
 
         if enable_inventory and snmp is not None:
             try:
@@ -580,6 +584,9 @@ def build_topology(
                 debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for {ip}: {e}")
 
         node_hostname = (sysname or ip).strip()
+        if not debug_enabled():
+            label = ip if node_hostname == ip else f"{ip} ({node_hostname})"
+            progress.render(len(visited), max_nodes, depth=depth, queue=len(q), label=label)
         node_class = classify_device(sysdescr or "", node_hostname)
         local_node_key = get_or_create_node(
             g,
@@ -599,7 +606,7 @@ def build_topology(
                 parse_show_ip_interface_brief,
             )
             try:
-                print(f"[roland] ssh enrich node={ip}")
+                debug(f"[roland] ssh enrich node={ip}")
                 ssh = SshClient(ip, ssh_profile, debug=ssh_debug)
                 ssh.connect()
                 results = ssh.run_commands(
@@ -657,7 +664,7 @@ def build_topology(
                         "ssh_source": ssh_source,
                     }
                 )
-                print(f"[roland] WARN: ssh failed node={ip}: {err}")
+                progress.status(f"[roland] WARN: ssh failed node={ip}: {err}")
         else:
             g.nodes[local_node_key].setdefault("ssh_status", "skipped")
             g.nodes[local_node_key].setdefault("ssh_error", "")
@@ -718,7 +725,7 @@ def build_topology(
             else:
                 g.nodes[local_node_key]["orphan_svis"] = []
         except Exception as e:
-            print(f"[roland] orphan_svis calc failed for {ip}: {e}")
+            progress.status(f"[roland] orphan_svis calc failed for {ip}: {e}")
             g.nodes[local_node_key]["orphan_svis"] = []
 
         if depth >= max_depth:
@@ -878,26 +885,26 @@ def build_topology(
                             debug(f"[DEBUG] Enqueued {remote_ip} at depth {depth + 1} from {ip} (role match)")
 
                     if edges_added >= max_edges:
-                        print("[roland] max-edges reached; stopping")
+                        progress.status("[roland] max-edges reached; stopping")
                         q.clear()
                         break
 
         except Exception as e:
             g.nodes[local_node_key]["cdp_error"] = str(e)
-            print(f"[roland] CDP block failed for {ip}: {type(e).__name__}: {e}")
+            progress.status(f"[roland] CDP block failed for {ip}: {type(e).__name__}: {e}")
 
         steps += 1
         if state_path and steps % state_every == 0:
             _save_state(state_path, g, q, visited)
 
-    print("[INFO] Running final edge deduplication...")
+    progress.status("[INFO] Running final edge deduplication...")
     g = deduplicate_graph(g)
 
     if merge_hostname:
-        print("[INFO] Running final hostname merge...")
+        progress.status("[INFO] Running final hostname merge...")
         g = merge_by_hostname(g)
 
-    print("[INFO] Enriching final L3 edge data...")
+    progress.status("[INFO] Enriching final L3 edge data...")
     g = enrich_edge_l3_data(g)
 
     debug(f"[DEBUG] Final graph: {len(g.nodes)} nodes, {len(g.edges)} edges")
@@ -912,7 +919,7 @@ def build_topology(
 
     orphans = seed_node.get("orphan_svis", [])
     if orphans:
-        print("\nOrphan SVIs detected on seed device:")
+        progress.status("\nOrphan SVIs detected on seed device:")
         for o in orphans:
             print(f" - IP: {o.get('ip','?')} VLAN: {o.get('vlan','?')} Iface: {o.get('ifname','?')}")
 

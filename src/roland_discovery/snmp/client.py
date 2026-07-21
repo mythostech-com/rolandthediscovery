@@ -5,6 +5,7 @@ import subprocess
 import time
 from typing import Iterable, Tuple, Optional
 from roland_discovery.util.logging import debug, log_raw_response
+from roland_discovery.util import progress
 
 
 _LINE_RE = re.compile(r"^\s*\.?((?P<oid>[0-9]+(?:\.[0-9]+)*))\s*=\s*(?P<rest>.*)$")
@@ -53,7 +54,7 @@ class SnmpV2cClient:
                 if attempt == self.max_outer_retries:
                     raise RuntimeError(f"{description} timed out after {self.max_outer_retries} attempts")
                 delay = self.backoff_base ** attempt
-                print(f"[WARN SNMP] {description} timeout (attempt {attempt}/{self.max_outer_retries}). Killed process. Retrying in {delay:.1f}s...")
+                progress.status(f"[WARN SNMP] {description} timeout (attempt {attempt}/{self.max_outer_retries}). Killed process. Retrying in {delay:.1f}s...")
                 time.sleep(delay)
             except subprocess.CalledProcessError as e:
                 attempt += 1
@@ -61,7 +62,7 @@ class SnmpV2cClient:
                 if attempt == self.max_outer_retries:
                     raise RuntimeError(f"{description} failed after {self.max_outer_retries} attempts: {msg}")
                 delay = self.backoff_base ** attempt
-                print(f"[WARN SNMP] {description} error (attempt {attempt}/{self.max_outer_retries}): {msg}. Retrying in {delay:.1f}s...")
+                progress.status(f"[WARN SNMP] {description} error (attempt {attempt}/{self.max_outer_retries}): {msg}. Retrying in {delay:.1f}s...")
                 time.sleep(delay)
             except Exception as e:
                 raise RuntimeError(f"Unexpected error in {description}: {e}")
@@ -101,7 +102,7 @@ class SnmpV2cClient:
                 success=False,
                 error=str(e)
             )
-            print(f"[WARN SNMP] health check failed for {self.host}: {e}")
+            progress.status(f"[WARN SNMP] health check failed for {self.host}: {e}")
             self._is_healthy = False
 
         return self._is_healthy
@@ -136,7 +137,7 @@ class SnmpV2cClient:
                 value_part = value_part.split(': ', 1)[1].strip()
             return value_part
         except Exception as e:
-            print(f"[WARN SNMP] get failed for {oid} after retries: {str(e)}")
+            progress.status(f"[WARN SNMP] get failed for {oid} after retries: {str(e)}")
             return None
 
     def walk(self, oid: str, community: str | None = None) -> Iterable[Tuple[str, str]]:
@@ -173,7 +174,7 @@ class SnmpV2cClient:
                 success=False,
                 error=str(e)
             )
-            print(f"[ERROR SNMP] walk failed for {oid} after retries: {str(e)}")
+            progress.status(f"[ERROR SNMP] walk failed for {oid} after retries: {str(e)}")
             return
 
         if os.getenv("ROLAND_SNMP_DEBUG") == "1":
@@ -194,4 +195,4 @@ class SnmpV2cClient:
             yield m.group("oid"), m.group("rest")
 
         if not parsed_any:
-            print(f"[WARN SNMP] snmpwalk output couldn't be parsed for OID {oid} (enable ROLAND_SNMP_DEBUG=1)")
+            progress.status(f"[WARN SNMP] snmpwalk output couldn't be parsed for OID {oid} (enable ROLAND_SNMP_DEBUG=1)")
