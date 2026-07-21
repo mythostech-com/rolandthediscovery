@@ -1,4 +1,11 @@
-# roland-the-discovery (v1.5)
+# roland-the-discovery (v1.6)
+
+## What's new vs v1.5
+- **Live progress bar**: interactive runs now show a single in-place bar (`Discovering [████░░░░] 55% 138/250
+  nodes depth=3 queue=41 10.21.250.87 (HUB-BB-NX01)`) instead of a scrolling line per node. Any real warning or
+  error (failed poll, SNMP health-check failure, SSH failure) still prints as its own permanent line — the bar
+  breaks for it, then resumes underneath. Falls back to the old plain scrolling line automatically when stdout
+  isn't a terminal (redirected to a file, etc.) or when `--debug` is set.
 
 ## What's new vs v1.4
 - **Quiet by default**: normal runs now print a clean set of progress/status lines instead of dozens of
