@@ -3,6 +3,18 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
+
+def debug_enabled() -> bool:
+    return os.getenv("ROLAND_DEBUG") == "1"
+
+
+def debug(*args, **kwargs) -> None:
+    """Print only when ROLAND_DEBUG=1 (set via --debug). Gates internal tracing
+    noise (per-OID/per-command chatter) that isn't useful at the default log level."""
+    if debug_enabled():
+        print(*args, **kwargs)
+
+
 def log_raw_response(
     protocol: str,          # "snmp" or "ssh"
     host: str,
@@ -37,4 +49,4 @@ def log_raw_response(
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-    print(f"[LOGGED RAW] {protocol.upper()} response saved: {path}")
+    debug(f"[LOGGED RAW] {protocol.upper()} response saved: {path}")

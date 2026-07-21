@@ -3,39 +3,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from netmiko import ConnectHandler, NetmikoTimeoutException, NetmikoAuthenticationException
-import json
-from datetime import datetime, timezone
 from roland_discovery.util.logging import log_raw_response
-
-def log_raw_response(
-    protocol: str,
-    host: str,
-    command: str,
-    raw_output: str,
-    success: bool = True,
-    error: Optional[str] = None
-):
-    log_dir = "out/logs/responses"
-    os.makedirs(log_dir, exist_ok=True)
-
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
-    safe_cmd = command.replace(" ", "-").replace("/", "_")[:50]
-    filename = f"{protocol}-{host}-{timestamp}-{safe_cmd}.json"
-
-    data = {
-        "timestamp": timestamp,
-        "host": host,
-        "command": command,
-        "raw_output": raw_output,
-        "success": success,
-        "error": error or None
-    }
-
-    path = os.path.join(log_dir, filename)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-    print(f"[LOGGED RAW] {protocol.upper()} response saved: {path}")
 
 @dataclass
 class SshProfile:

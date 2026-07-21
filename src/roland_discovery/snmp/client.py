@@ -4,7 +4,7 @@ import re
 import subprocess
 import time
 from typing import Iterable, Tuple, Optional
-from roland_discovery.util.logging import log_raw_response
+from roland_discovery.util.logging import debug, log_raw_response
 
 
 _LINE_RE = re.compile(r"^\s*\.?((?P<oid>[0-9]+(?:\.[0-9]+)*))\s*=\s*(?P<rest>.*)$")
@@ -40,7 +40,7 @@ class SnmpV2cClient:
                 output, _ = process.communicate(timeout=timeout_val)
                 if process.returncode != 0:
                     raise subprocess.CalledProcessError(process.returncode, cmd, output=output)
-                print(f"[SNMP] {description} completed in {time.time() - start_time:.1f}s")
+                debug(f"[SNMP] {description} completed in {time.time() - start_time:.1f}s")
                 return output.strip()
             except subprocess.TimeoutExpired:
                 attempt += 1
@@ -101,14 +101,14 @@ class SnmpV2cClient:
                 success=False,
                 error=str(e)
             )
-            print(f"[DEBUG SNMP] Health check failed for {self.host}: {str(e)}")
+            print(f"[WARN SNMP] health check failed for {self.host}: {e}")
             self._is_healthy = False
 
         return self._is_healthy
 
     def get(self, oid: str) -> Optional[str]:
         if not self._check_snmp_health():
-            print(f"[SKIP SNMP] Health check failed — skipping get {oid} on {self.host}")
+            debug(f"[SKIP SNMP] Health check failed — skipping get {oid} on {self.host}")
             return None
 
         cmd = [
@@ -141,7 +141,7 @@ class SnmpV2cClient:
 
     def walk(self, oid: str, community: str | None = None) -> Iterable[Tuple[str, str]]:
         if not self._check_snmp_health():
-            print(f"[SKIP SNMP] Health check failed — skipping walk {oid} on {self.host}")
+            debug(f"[SKIP SNMP] Health check failed — skipping walk {oid} on {self.host}")
             return
 
         comm = community or self.community
