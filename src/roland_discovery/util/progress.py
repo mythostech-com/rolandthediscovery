@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 _bar_active = False
@@ -12,6 +13,19 @@ def _is_tty() -> bool:
         return sys.stdout.isatty()
     except Exception:
         return False
+
+
+def clear_screen() -> None:
+    """Clear the terminal at startup, for a clean first screen. No-op when stdout
+    isn't a terminal (redirected output, CI, etc).
+
+    Uses the native OS command (cls/clear) rather than an ANSI escape - the same
+    reason render() avoids ANSI: not every console interprets those, and printing
+    one literally would be a worse first impression than not clearing at all.
+    """
+    if not _is_tty():
+        return
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def render(current: int, total: int, *, depth: int, queue: int, label: str, phase: str = "") -> None:
