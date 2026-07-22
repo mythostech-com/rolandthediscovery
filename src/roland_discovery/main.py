@@ -47,6 +47,9 @@ def main():
     p.add_argument("--max-nodes", type=int, default=300)
     p.add_argument("--state", default="out/state.json")
     p.add_argument("--resume", help="Resume from state file")
+    p.add_argument("--retry-failed", action="store_true",
+                   help="With --resume: re-queue nodes that previously failed SNMP poll or SSH enrichment "
+                        "(no attempt limit - keeps retrying across runs until they succeed or you stop passing this flag)")
 
     p.add_argument("--ssh", action="store_true")
     p.add_argument("--ssh-user", default=None)
@@ -123,6 +126,7 @@ def main():
         max_edges=args.max_edges,
         state_path=args.state,
         resume_path=args.resume,
+        retry_failed=args.retry_failed,
         enable_ssh=args.ssh,
         ssh_user=ssh_user,
         ssh_pass=ssh_pass,

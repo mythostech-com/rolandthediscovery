@@ -410,6 +410,7 @@ def build_topology(
     state_path: Optional[str] = None,
     resume_path: Optional[str] = None,
     state_every: int = 10,
+    retry_failed: bool = False,
     enable_inventory: bool = True,
     enable_ssh: bool = False,
     ssh_user: str = "",
@@ -424,6 +425,27 @@ def build_topology(
     if resume_path and os.path.exists(resume_path):
         g, q, visited = _load_state(resume_path)
         progress.status(f"[INFO] Resumed with {len(q)} items in queue and {len(visited)} visited nodes")
+
+        if retry_failed:
+            requeued = 0
+            queued_ips = {ip for ip, _d in q}
+            for node_id, attrs in g.nodes(data=True):
+                if attrs.get("poll_status") != "failed" and attrs.get("ssh_status") != "failed":
+                    continue
+                if node_id in queued_ips:
+                    continue
+                visited.discard(node_id)
+                try:
+                    depth = int(attrs.get("discovery_depth", 0))
+                except (TypeError, ValueError):
+                    depth = 0
+                q.append((node_id, depth))
+                queued_ips.add(node_id)
+                requeued += 1
+            if requeued:
+                progress.status(f"[INFO] --retry-failed: re-queued {requeued} previously-failed node(s)")
+            else:
+                progress.status("[INFO] --retry-failed: no failed nodes found to retry")
     else:
         g = nx.MultiGraph()
         q = deque([(seed, 0)])
