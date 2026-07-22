@@ -1,4 +1,11 @@
-# roland-the-discovery (v2.1)
+# roland-the-discovery (v2.2)
+
+## What's new vs v2.1
+- **Fixed a crash where one bad output file killed everything after it**: if `topology.json`/`.dot`/`.html`/
+  `inventory.csv` fails to write (e.g. `out\inventory.csv` still open in Excel from a previous run - a real
+  `PermissionError` seen in the field), Roland now prints a warning for that specific file and keeps going,
+  instead of crashing before `--summary` (and any exports queued after the failed one) ever run. The crawl
+  itself doesn't depend on these files, so a locked file shouldn't cost you the console summary too.
 
 ## What's new vs v2.0
 - **Switch stack support in the asset catalog**: a stacked switch (e.g. a stack of 3850s) reports one

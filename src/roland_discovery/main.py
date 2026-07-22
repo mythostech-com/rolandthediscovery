@@ -33,6 +33,19 @@ def _print_banner(args) -> None:
     print("=" * _BANNER_WIDTH)
 
 
+def _safe_export(description: str, fn, *args, **kwargs) -> bool:
+    """Run an export step without letting a failure (e.g. the output file is
+    open/locked in another program) take down everything after it - the crawl
+    itself already succeeded by this point, so a bad export shouldn't cost you
+    --summary or the other output files too."""
+    try:
+        fn(*args, **kwargs)
+        return True
+    except Exception as e:
+        progress.status(f"[roland] WARN: failed to write {description}: {e}")
+        return False
+
+
 def main():
     p = argparse.ArgumentParser(description="Roland Network Discovery Tool")
 
@@ -145,15 +158,15 @@ def main():
     print(f"[INFO] Final graph: {len(g.nodes)} nodes, {len(g.edges)} edges")
 
     os.makedirs("out", exist_ok=True)
-    export_json(g, args.out)
-    export_dot(g, args.dot)
+    _safe_export(args.out, export_json, g, args.out)
+    _safe_export(args.dot, export_dot, g, args.dot)
 
     if args.html:
-        export_html(g, args.html)
-        print(f"[INFO] HTML saved to {args.html}")
+        if _safe_export(args.html, export_html, g, args.html):
+            print(f"[INFO] HTML saved to {args.html}")
 
     if args.inventory_csv:
-        export_inventory_csv(g, args.inventory_csv)
+        _safe_export(args.inventory_csv, export_inventory_csv, g, args.inventory_csv)
 
     if args.summary:
         print_summary(g)
