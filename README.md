@@ -1,4 +1,18 @@
-# roland-the-discovery (v2.0)
+# roland-the-discovery (v2.1)
+
+## What's new vs v2.0
+- **Switch stack support in the asset catalog**: a stacked switch (e.g. a stack of 3850s) reports one
+  ENTITY-MIB chassis entry *per physical stack member*, each with its own make/model/serial. Previously only
+  the first member was captured. Now every member is captured:
+  - `out/inventory.csv` gets one row per physical stack member (not per node) - a `stack_unit` column (e.g.
+    "Switch 1", "Switch 2") identifies which one, and hostname/location/ip are repeated across the rows so
+    you can still filter/group by device.
+  - Non-stacked (single-chassis) devices are unaffected - still exactly one row, `stack_unit` blank.
+  - `topology.json` nodes get a new `device_stack` list (one entry per member); the existing single
+    `device_make`/`device_model`/`device_serial` fields still reflect the first/primary member, for anything
+    that only cares about one summary value per node.
+  - The HTML tooltip shows a `Stack: N units` breakdown with each member's model/serial when a node has more
+    than one stack member.
 
 ## What's new vs v1.9
 - **`--retry-failed`**: combined with `--resume`, re-queues any node that previously failed SNMP poll or SSH

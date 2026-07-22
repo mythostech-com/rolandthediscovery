@@ -111,6 +111,21 @@ def _merge_attrs(target: Dict, source: Dict, source_node_id: str) -> None:
         if sval and sval != "unknown" and (not tval or tval == "unknown"):
             target[key] = sval
 
+    # Merge device_stack (dedup by serial - a merged node may have been visited
+    # via multiple raw IPs that each re-fetched the same physical stack)
+    t_stack = list(target.get("device_stack") or [])
+    s_stack = list(source.get("device_stack") or [])
+    if s_stack:
+        seen_serials = {m.get("serial") for m in t_stack if m.get("serial")}
+        for member in s_stack:
+            serial = member.get("serial")
+            if serial and serial in seen_serials:
+                continue
+            t_stack.append(member)
+            if serial:
+                seen_serials.add(serial)
+        target["device_stack"] = t_stack
+
     # Merge ip_to_ifname
     t_map = dict(target.get("ip_to_ifname") or {})
     s_map = dict(source.get("ip_to_ifname") or {})

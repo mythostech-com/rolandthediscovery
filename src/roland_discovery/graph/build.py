@@ -463,7 +463,7 @@ def build_topology(
     ip_to_ifname: Dict[str, str] = {}
     ips: Set[str] = set()
     snmp = None
-    seed_inventory = DeviceInventory()
+    seed_stack: List[DeviceInventory] = []
 
     def _seed_phase(p: str) -> None:
         if debug_enabled():
@@ -498,7 +498,7 @@ def build_topology(
     if enable_inventory and snmp is not None:
         try:
             _seed_phase("SNMP: inventory (ENTITY-MIB)")
-            seed_inventory = get_device_inventory(snmp)
+            seed_stack = get_device_inventory(snmp)
         except Exception as e:
             debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for seed {seed}: {e}")
 
@@ -529,12 +529,15 @@ def build_topology(
     g.nodes[seed_node_key]["main_ip"] = _pick_main_ip(seed, g.nodes[seed_node_key]["ips"], ip_to_ifname)
     if sysname:
         g.nodes[seed_node_key]["location"] = seed_hostname
-    if seed_inventory.make:
-        g.nodes[seed_node_key]["device_make"] = seed_inventory.make
-    if seed_inventory.model:
-        g.nodes[seed_node_key]["device_model"] = seed_inventory.model
-    if seed_inventory.serial:
-        g.nodes[seed_node_key]["device_serial"] = seed_inventory.serial
+    if seed_stack:
+        primary = seed_stack[0]
+        if primary.make:
+            g.nodes[seed_node_key]["device_make"] = primary.make
+        if primary.model:
+            g.nodes[seed_node_key]["device_model"] = primary.model
+        if primary.serial:
+            g.nodes[seed_node_key]["device_serial"] = primary.serial
+        g.nodes[seed_node_key]["device_stack"] = [asdict(m) for m in seed_stack]
 
     # SSH profile
     ssh_profile = None
@@ -600,7 +603,7 @@ def build_topology(
         ip_to_ifname = {}
         ips = set()
         snmp = None
-        node_inventory = DeviceInventory()
+        node_stack: List[DeviceInventory] = []
 
         try:
             snmp = _snmp_factory(profile, ip)
@@ -621,7 +624,7 @@ def build_topology(
         if enable_inventory and snmp is not None:
             try:
                 _phase("SNMP: inventory (ENTITY-MIB)")
-                node_inventory = get_device_inventory(snmp)
+                node_stack = get_device_inventory(snmp)
             except Exception as e:
                 debug(f"[DEBUG] ENTITY-MIB inventory lookup failed for {ip}: {e}")
 
@@ -731,12 +734,15 @@ def build_topology(
         g.nodes[local_node_key]["main_ip"] = _pick_main_ip(ip, g.nodes[local_node_key]["ips"], ip_to_ifname)
         if sysname:
             g.nodes[local_node_key]["location"] = node_hostname
-        if node_inventory.make:
-            g.nodes[local_node_key]["device_make"] = node_inventory.make
-        if node_inventory.model:
-            g.nodes[local_node_key]["device_model"] = node_inventory.model
-        if node_inventory.serial:
-            g.nodes[local_node_key]["device_serial"] = node_inventory.serial
+        if node_stack:
+            primary = node_stack[0]
+            if primary.make:
+                g.nodes[local_node_key]["device_make"] = primary.make
+            if primary.model:
+                g.nodes[local_node_key]["device_model"] = primary.model
+            if primary.serial:
+                g.nodes[local_node_key]["device_serial"] = primary.serial
+            g.nodes[local_node_key]["device_stack"] = [asdict(m) for m in node_stack]
 
         if depth == 0:
             g.nodes[local_node_key]["is_seed"] = True

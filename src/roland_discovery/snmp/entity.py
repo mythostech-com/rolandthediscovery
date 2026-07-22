@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 # ENTITY-MIB (RFC 2737) entPhysicalTable columns.
 ENT_PHYSICAL_CLASS_OID = "1.3.6.1.2.1.47.1.1.1.1.5"
+ENT_PHYSICAL_NAME_OID = "1.3.6.1.2.1.47.1.1.1.1.7"
 ENT_PHYSICAL_SERIAL_OID = "1.3.6.1.2.1.47.1.1.1.1.11"
 ENT_PHYSICAL_MFG_NAME_OID = "1.3.6.1.2.1.47.1.1.1.1.12"
 ENT_PHYSICAL_MODEL_NAME_OID = "1.3.6.1.2.1.47.1.1.1.1.13"
@@ -17,6 +18,7 @@ class DeviceInventory:
     make: Optional[str] = None
     model: Optional[str] = None
     serial: Optional[str] = None
+    name: Optional[str] = None  # entPhysicalName, e.g. "Switch 1" - the stack member label, if any
 
 
 def _clean_value(v: str) -> str:
@@ -32,34 +34,38 @@ def _index_map(snmp, oid: str) -> Dict[int, str]:
     return out
 
 
-def get_device_inventory(snmp) -> DeviceInventory:
-    """Best-effort chassis make/model/serial via ENTITY-MIB.
+def get_device_inventory(snmp) -> List[DeviceInventory]:
+    """Best-effort chassis make/model/serial via ENTITY-MIB - one entry per
+    physical chassis (entPhysicalClass=3).
 
-    Picks the first entPhysicalIndex classified as a chassis (class=3). If no
-    entry reports a chassis class (some platforms omit it), falls back to the
-    lowest-numbered physical index, which is conventionally the chassis on
-    Cisco IOS/IOS-XE/NX-OS.
+    A standalone switch has exactly one chassis entry. A switch *stack*
+    (e.g. a stack of 3850s) reports one chassis entry per stack member, each
+    with its own make/model/serial - so this returns a list rather than a
+    single value, with each member's entPhysicalName (typically "Switch 1",
+    "Switch 2", etc.) included for identification.
+
+    Falls back to the lowest-numbered physical index if no entry reports a
+    chassis class (some platforms omit it) - matches prior single-chassis
+    behavior for non-stacked devices.
     """
     classes = _index_map(snmp, ENT_PHYSICAL_CLASS_OID)
     serials = _index_map(snmp, ENT_PHYSICAL_SERIAL_OID)
     makes = _index_map(snmp, ENT_PHYSICAL_MFG_NAME_OID)
     models = _index_map(snmp, ENT_PHYSICAL_MODEL_NAME_OID)
+    names = _index_map(snmp, ENT_PHYSICAL_NAME_OID)
 
-    chassis_idx = None
-    for idx, cls in classes.items():
-        if cls == ENT_PHYSICAL_CLASS_CHASSIS:
-            chassis_idx = idx
-            break
+    chassis_indices = sorted(idx for idx, cls in classes.items() if cls == ENT_PHYSICAL_CLASS_CHASSIS)
 
-    if chassis_idx is None:
+    if not chassis_indices:
         candidates = sorted(set(serials) | set(makes) | set(models))
-        chassis_idx = candidates[0] if candidates else None
+        chassis_indices = candidates[:1]
 
-    if chassis_idx is None:
-        return DeviceInventory()
-
-    return DeviceInventory(
-        make=makes.get(chassis_idx) or None,
-        model=models.get(chassis_idx) or None,
-        serial=serials.get(chassis_idx) or None,
-    )
+    return [
+        DeviceInventory(
+            make=makes.get(idx) or None,
+            model=models.get(idx) or None,
+            serial=serials.get(idx) or None,
+            name=names.get(idx) or None,
+        )
+        for idx in chassis_indices
+    ]
