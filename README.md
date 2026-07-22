@@ -1,4 +1,14 @@
-# roland-the-discovery (v1.9)
+# roland-the-discovery (v2.0)
+
+## What's new vs v1.9
+- **`--retry-failed`**: combined with `--resume`, re-queues any node that previously failed SNMP poll or SSH
+  enrichment (checked via `poll_status`/`ssh_status` in the saved state), instead of requiring a full re-crawl
+  to pick up transient failures. Re-queued at the node's original discovery depth. No retry-count limit — keep
+  passing the flag across runs until a device succeeds or you decide to stop (e.g. a device that's genuinely
+  out of scope, like one managed by another team).
+  ```powershell
+  roland-discovery --resume out\state.json --retry-failed --seed 10.21.250.41 --depth 6 --ssh --html out\topology.html
+  ```
 
 ## What's new vs v1.8
 - Clears the terminal right before the startup banner, for a clean first screen instead of the banner
