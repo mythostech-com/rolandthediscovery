@@ -172,6 +172,13 @@ def _node_title(attrs: dict, node_id: str) -> str:
     if serial:
         parts.append(f"Serial: {serial}")
 
+    stack = attrs.get("device_stack") or []
+    if len(stack) > 1:
+        parts.append(f"Stack: {len(stack)} units")
+        for member in stack:
+            label = member.get("name") or "?"
+            parts.append(f"  {label}: {member.get('model') or '?'}  SN={member.get('serial') or '?'}")
+
     # All IPs
     ips = attrs.get("ips", [])
     if ips and len(ips) > 1:
